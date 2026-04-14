@@ -854,7 +854,7 @@ std::string GfxRenderer::truncatedText(const int fontId, const char* text, const
                                        const EpdFontFamily::Style style) const {
   if (!text || maxWidth <= 0) return "";
 
-  std::string item = text;
+  std::string item = toVisualOrder(text);
   // U+2026 HORIZONTAL ELLIPSIS (UTF-8: 0xE2 0x80 0xA6)
   const char* ellipsis = "\xe2\x80\xa6";
   int textWidth = getTextWidth(fontId, item.c_str(), style);
@@ -876,7 +876,7 @@ std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* 
 
   if (!text || maxWidth <= 0 || maxLines <= 0) return lines;
 
-  std::string remaining = text;
+  std::string remaining = toVisualOrder(text);
   std::string currentLine;
 
   while (!remaining.empty()) {
