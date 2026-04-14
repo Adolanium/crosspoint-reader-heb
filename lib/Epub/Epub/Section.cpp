@@ -10,7 +10,7 @@
 #include "parsers/ChapterHtmlSlimParser.h"
 
 namespace {
-constexpr uint8_t SECTION_FILE_VERSION = 19;
+constexpr uint8_t SECTION_FILE_VERSION = 30;  // 29→30: detect RTL from body lang/xml:lang, fix block-level RTL check
 constexpr uint32_t HEADER_SIZE = sizeof(uint8_t) + sizeof(int) + sizeof(float) + sizeof(bool) + sizeof(uint8_t) +
                                  sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint16_t) + sizeof(bool) + sizeof(bool) +
                                  sizeof(uint8_t) + sizeof(uint32_t) + sizeof(uint32_t);
@@ -203,12 +203,17 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
     }
   }
 
+  // Auto-detect RTL direction from EPUB language metadata (fallback when CSS/HTML don't specify)
+  const std::string& lang = epub->getLanguage();
+  const bool bookIsRtl = lang.size() >= 2 && (lang.substr(0, 2) == "he" || lang.substr(0, 2) == "iw" ||
+                                               lang.substr(0, 2) == "ar" || lang.substr(0, 2) == "fa");
+
   ChapterHtmlSlimParser visitor(
       epub, tmpHtmlPath, renderer, fontId, lineCompression, extraParagraphSpacing, paragraphAlignment, viewportWidth,
       viewportHeight, hyphenationEnabled,
       [this, &lut](std::unique_ptr<Page> page) { lut.emplace_back(this->onPageComplete(std::move(page))); },
-      embeddedStyle, contentBase, imageBasePath, imageRendering, popupFn, cssParser);
-  Hyphenator::setPreferredLanguage(epub->getLanguage());
+      embeddedStyle, contentBase, imageBasePath, imageRendering, popupFn, cssParser, bookIsRtl);
+  Hyphenator::setPreferredLanguage(lang);
   success = visitor.parseAndBuildPages();
 
   Storage.remove(tmpHtmlPath.c_str());

@@ -22,6 +22,7 @@ struct BlockStyle {
   int16_t textIndent = 0;
   bool textIndentDefined = false;  // true if text-indent was explicitly set in CSS
   bool textAlignDefined = false;   // true if text-align was explicitly set in CSS
+  bool isRtl = false;              // true if text direction is right-to-left
 
   // Combined horizontal insets (margin + padding)
   [[nodiscard]] int16_t leftInset() const { return marginLeft + paddingLeft; }
@@ -58,6 +59,8 @@ struct BlockStyle {
       combinedBlockStyle.alignment = alignment;
       combinedBlockStyle.textAlignDefined = textAlignDefined;
     }
+    // RTL direction: child inherits from parent (CSS direction is inherited)
+    combinedBlockStyle.isRtl = child.isRtl || isRtl;
     return combinedBlockStyle;
   }
 
@@ -65,7 +68,7 @@ struct BlockStyle {
   // emSize is the current font line height, used for em/rem unit conversion
   // paragraphAlignment is the user's paragraphAlignment setting preference
   static BlockStyle fromCssStyle(const CssStyle& cssStyle, const float emSize, const CssTextAlign paragraphAlignment,
-                                 const uint16_t viewportWidth = 0) {
+                                 const uint16_t viewportWidth = 0, const bool inheritedRtl = false) {
     BlockStyle blockStyle;
     const float vw = viewportWidth;
     // Resolve all CssLength values to pixels using the current font's em size and viewport width
@@ -85,13 +88,25 @@ struct BlockStyle {
       blockStyle.textIndent = cssStyle.textIndent.toPixelsInt16(emSize, vw);
       blockStyle.textIndentDefined = true;
     }
+
+    // Direction: CSS direction overrides inherited, otherwise inherit from parent
+    blockStyle.isRtl = cssStyle.hasDirection() ? (cssStyle.direction == CssDirection::Rtl) : inheritedRtl;
+
     blockStyle.textAlignDefined = cssStyle.hasTextAlign();
     // User setting overrides CSS, unless "Book's Style" alignment setting is selected
+    CssTextAlign resolvedAlignment;
     if (paragraphAlignment == CssTextAlign::None) {
-      blockStyle.alignment = blockStyle.textAlignDefined ? cssStyle.textAlign : CssTextAlign::Justify;
+      resolvedAlignment = blockStyle.textAlignDefined ? cssStyle.textAlign : CssTextAlign::Justify;
     } else {
-      blockStyle.alignment = paragraphAlignment;
+      resolvedAlignment = paragraphAlignment;
     }
+    // Resolve logical alignment (Start/End) to physical (Left/Right) based on direction
+    if (resolvedAlignment == CssTextAlign::Start) {
+      resolvedAlignment = blockStyle.isRtl ? CssTextAlign::Right : CssTextAlign::Left;
+    } else if (resolvedAlignment == CssTextAlign::End) {
+      resolvedAlignment = blockStyle.isRtl ? CssTextAlign::Left : CssTextAlign::Right;
+    }
+    blockStyle.alignment = resolvedAlignment;
     return blockStyle;
   }
 };

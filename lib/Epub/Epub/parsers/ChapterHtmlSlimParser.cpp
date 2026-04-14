@@ -119,7 +119,108 @@ void ChapterHtmlSlimParser::flushPartWordBuffer() {
 
   // flush the buffer
   partWordBuffer[partWordBufferIndex] = '\0';
-  currentTextBlock->addWord(partWordBuffer, fontStyle, false, nextWordContinues);
+
+  const bool isRtlBlock = currentTextBlock && currentTextBlock->getBlockStyle().isRtl;
+
+  // In RTL blocks, split leading/trailing brackets and punctuation from all non-English words.
+  // This ensures brackets get positioned independently in RTL flow rather than being
+  // reversed or misplaced when bundled with Hebrew or number content.
+  // English words only have trailing commas/periods split (brackets stay attached for LTR).
+  if (isRtlBlock && partWordBufferIndex > 1) {
+    // Check if word contains Latin letters (English content)
+    bool hasLatin = false;
+    {
+      const auto* scan = reinterpret_cast<const unsigned char*>(partWordBuffer);
+      uint32_t cp;
+      while ((cp = utf8NextCodepoint(&scan))) {
+        if (isStrongLtrCodepoint(cp)) { hasLatin = true; break; }
+      }
+    }
+
+    // Find leading brackets
+    int leadEnd = 0;
+    if (!hasLatin) {
+      while (leadEnd < partWordBufferIndex) {
+        const char c = partWordBuffer[leadEnd];
+        if (c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}') {
+          leadEnd++;
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Find trailing brackets and punctuation
+    int trailStart = partWordBufferIndex;
+    while (trailStart > leadEnd) {
+      const char c = partWordBuffer[trailStart - 1];
+      if (c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}') {
+        if (!hasLatin) { trailStart--; } else { break; }
+      } else if (c == ',' || c == '.' || c == ';' || c == ':' || c == '!' || c == '?') {
+        trailStart--;
+      } else {
+        break;
+      }
+    }
+
+    // Split if we found leading or trailing parts with a non-empty core
+    if ((leadEnd > 0 || trailStart < partWordBufferIndex) && trailStart > leadEnd) {
+      // Emit each leading bracket as its own word, mirrored for RTL display.
+      // Unicode BiDi mirrors bracket glyphs in RTL: ( renders as ), ) renders as (.
+      auto mirrorChar = [](char c) -> char {
+        switch (c) {
+          case '(': return ')';
+          case ')': return '(';
+          case '[': return ']';
+          case ']': return '[';
+          case '{': return '}';
+          case '}': return '{';
+          default: return c;
+        }
+      };
+      for (int i = 0; i < leadEnd; i++) {
+        char bracket[2] = {mirrorChar(partWordBuffer[i]), '\0'};
+        currentTextBlock->addWord(bracket, fontStyle, false, nextWordContinues);
+        nextWordContinues = true;
+      }
+
+      // Emit core word (between leading and trailing)
+      const char savedTrail = partWordBuffer[trailStart];
+      partWordBuffer[trailStart] = '\0';
+      const char* core = &partWordBuffer[leadEnd];
+      if (wordIsRtl(core)) {
+        std::string coreStr(core);
+        reverseGraphemeClusters(coreStr);
+        currentTextBlock->addWord(std::move(coreStr), fontStyle, false, nextWordContinues);
+      } else {
+        currentTextBlock->addWord(core, fontStyle, false, nextWordContinues);
+      }
+      partWordBuffer[trailStart] = savedTrail;
+
+      // Emit each trailing bracket/punctuation as its own word (brackets mirrored for RTL)
+      for (int i = trailStart; i < partWordBufferIndex; i++) {
+        char c = partWordBuffer[i];
+        if (c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}') {
+          c = mirrorChar(c);
+        }
+        char punc[2] = {c, '\0'};
+        currentTextBlock->addWord(punc, fontStyle, false, true);
+      }
+
+      partWordBufferIndex = 0;
+      nextWordContinues = false;
+      return;
+    }
+  }
+
+  // Standard emit (no splitting needed or not in RTL block)
+  if (isRtlBlock && wordIsRtl(partWordBuffer)) {
+    std::string reversedBuf(partWordBuffer);
+    reverseGraphemeClusters(reversedBuf);
+    currentTextBlock->addWord(std::move(reversedBuf), fontStyle, false, nextWordContinues);
+  } else {
+    currentTextBlock->addWord(partWordBuffer, fontStyle, false, nextWordContinues);
+  }
   partWordBufferIndex = 0;
   nextWordContinues = false;
 }
@@ -162,9 +263,10 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     return;
   }
 
-  // Extract class, style, and id attributes
+  // Extract class, style, id, and dir attributes
   std::string classAttr;
   std::string styleAttr;
+  const char* dirAttr = nullptr;
   if (atts != nullptr) {
     for (int i = 0; atts[i]; i += 2) {
       if (strcmp(atts[i], "class") == 0) {
@@ -174,6 +276,8 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       } else if (strcmp(atts[i], "id") == 0) {
         // Defer recording until startNewTextBlock, after previous block is flushed to pages
         self->pendingAnchorId = atts[i + 1];
+      } else if (strcmp(atts[i], "dir") == 0) {
+        dirAttr = atts[i + 1];
       }
     }
   }
@@ -181,6 +285,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   auto centeredBlockStyle = BlockStyle();
   centeredBlockStyle.textAlignDefined = true;
   centeredBlockStyle.alignment = CssTextAlign::Center;
+  centeredBlockStyle.isRtl = self->defaultDirectionRtl;
 
   // Compute CSS style for this element early so display:none can short-circuit
   // before tag-specific branches emit any content or metadata.
@@ -190,6 +295,34 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     if (!styleAttr.empty()) {
       CssStyle inlineStyle = CssParser::parseInlineStyle(styleAttr);
       cssStyle.applyOver(inlineStyle);
+    }
+  }
+
+  // HTML dir attribute overrides CSS direction property (per HTML spec)
+  if (dirAttr) {
+    cssStyle.direction = (strcmp(dirAttr, "rtl") == 0) ? CssDirection::Rtl : CssDirection::Ltr;
+    cssStyle.defined.direction = 1;
+    // Update inherited default when set on html/body
+    if (strcmp(name, "html") == 0 || strcmp(name, "body") == 0) {
+      self->defaultDirectionRtl = (cssStyle.direction == CssDirection::Rtl);
+    }
+  } else if (cssStyle.hasDirection() && (strcmp(name, "html") == 0 || strcmp(name, "body") == 0)) {
+    // CSS direction on html/body also sets the inherited default
+    self->defaultDirectionRtl = (cssStyle.direction == CssDirection::Rtl);
+  }
+
+  // Detect Hebrew from lang/xml:lang on html/body as RTL fallback
+  // (some EPUBs have dc:language="en" but body lang="he-IL")
+  if (!self->defaultDirectionRtl && (strcmp(name, "html") == 0 || strcmp(name, "body") == 0)) {
+    const char* lang = getAttribute(atts, "lang");
+    if (!lang) lang = getAttribute(atts, "xml:lang");
+    if (lang && (strncmp(lang, "he", 2) == 0 || strncmp(lang, "iw", 2) == 0 ||
+                 strncmp(lang, "ar", 2) == 0 || strncmp(lang, "fa", 2) == 0)) {
+      self->defaultDirectionRtl = true;
+      if (!cssStyle.hasDirection()) {
+        cssStyle.direction = CssDirection::Rtl;
+        cssStyle.defined.direction = 1;
+      }
     }
   }
 
@@ -233,6 +366,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
 
     auto tableCellBlockStyle = BlockStyle();
     tableCellBlockStyle.textAlignDefined = true;
+    tableCellBlockStyle.isRtl = self->defaultDirectionRtl;
     const auto align = (self->paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
                            ? CssTextAlign::Justify
                            : static_cast<CssTextAlign>(self->paragraphAlignment);
@@ -556,11 +690,13 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
 
   const float emSize = static_cast<float>(self->renderer.getFontAscenderSize(self->fontId));
   const auto userAlignmentBlockStyle = BlockStyle::fromCssStyle(
-      cssStyle, emSize, static_cast<CssTextAlign>(self->paragraphAlignment), self->viewportWidth);
+      cssStyle, emSize, static_cast<CssTextAlign>(self->paragraphAlignment), self->viewportWidth,
+      self->defaultDirectionRtl);
 
   if (matches(name, HEADER_TAGS, NUM_HEADER_TAGS)) {
     self->currentCssStyle = cssStyle;
-    auto headerBlockStyle = BlockStyle::fromCssStyle(cssStyle, emSize, CssTextAlign::Center, self->viewportWidth);
+    auto headerBlockStyle =
+        BlockStyle::fromCssStyle(cssStyle, emSize, CssTextAlign::Center, self->viewportWidth, self->defaultDirectionRtl);
     headerBlockStyle.textAlignDefined = true;
     if (self->embeddedStyle && cssStyle.hasTextAlign()) {
       headerBlockStyle.alignment = cssStyle.textAlign;
@@ -974,6 +1110,7 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
 bool ChapterHtmlSlimParser::parseAndBuildPages() {
   auto paragraphAlignmentBlockStyle = BlockStyle();
   paragraphAlignmentBlockStyle.textAlignDefined = true;
+  paragraphAlignmentBlockStyle.isRtl = defaultDirectionRtl;
   // Resolve None sentinel to Justify for initial block (no CSS context yet)
   const auto align = (this->paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
                          ? CssTextAlign::Justify
