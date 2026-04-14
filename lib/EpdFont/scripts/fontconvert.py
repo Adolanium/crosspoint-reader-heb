@@ -73,6 +73,12 @@ intervals = [
     ### Cyrillic ###
     # Russian, Ukrainian, Bulgarian, etc.
     (0x0400, 0x04FF),
+    ### Hebrew ###
+    # Hebrew alphabet, vowel points (nikkud), and cantillation marks
+    (0x0590, 0x05FF),
+    ### Alphabetic Presentation Forms (Hebrew subset) ###
+    # Hebrew ligatures and alternative letter forms
+    (0xFB1D, 0xFB4F),
     ### Math Symbols (common subset) ###
     # Superscripts and Subscripts
     (0x2070, 0x209F),
