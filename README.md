@@ -44,6 +44,31 @@ This project is **not affiliated with Xteink**; it's built as a community projec
 
 Multi-language support: Read EPUBs in various languages, including English, Spanish, French, German, Italian, Portuguese, Russian, Ukrainian, Polish, Swedish, Norwegian, [and more](./USER_GUIDE.md#supported-languages).
 
+### Hebrew (RTL) Support
+
+This fork adds Hebrew language support for reading Hebrew EPUBs on the Xteink X4.
+
+**What works:**
+- Hebrew text rendering with Noto Sans font (all sizes and weights)
+- Right-to-left text layout with proper word ordering
+- Nikkud (vowel points) and cantillation marks positioned correctly
+- Mixed Hebrew/English/number content in the same paragraph
+- Parentheses and brackets display correctly in RTL text (Unicode BiDi mirroring)
+- CSS `direction: rtl` and HTML `dir="rtl"` detection
+- Auto-detection of Hebrew EPUBs from `dc:language` metadata
+- Justified, centered, and aligned RTL text
+- Hebrew book titles on the home screen, file browser, and status bar
+- Numbers within Hebrew text (e.g. "8,000") preserve LTR digit order
+- Trailing punctuation (commas, periods) positioned correctly in RTL flow
+
+**Known limitations:**
+- Hebrew glyphs are only available in **Noto Sans** — Bookerly and OpenDyslexic will show replacement characters for Hebrew
+- No Hebrew hyphenation dictionary (long words won't be hyphenated)
+- No RTL page progression (page turn direction stays the same as English books)
+- UI language remains in English (no Hebrew translation for menus/settings)
+
+**Font requirement:** Select **Noto Sans** as your reading font in settings for Hebrew content. The UI fonts (file browser, status bar) include Hebrew glyphs by default.
+
 See [the user guide](./USER_GUIDE.md) for instructions on operating CrossPoint, including the
 [KOReader Sync quick setup](./USER_GUIDE.md#365-koreader-sync-quick-setup).
 
