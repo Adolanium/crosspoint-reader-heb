@@ -1,0 +1,8 @@
+# Generated font data — always keep our version on merge.
+# After an upstream merge, run `bash scripts/regen-after-merge.sh`
+# to rebuild these from the current font sources + Hebrew overrides.
+#
+# Requires one-time local setup:
+#   git config --global merge.ours.driver true
+lib/EpdFont/builtinFonts/*.h merge=ours
+src/fontIds.h               merge=ours

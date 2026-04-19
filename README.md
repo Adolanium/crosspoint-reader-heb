@@ -69,6 +69,39 @@ This fork adds Hebrew language support for reading Hebrew EPUBs on the Xteink X4
 
 **Font requirement:** Select **Noto Sans** as your reading font in settings for Hebrew content. The UI fonts (file browser, status bar) include Hebrew glyphs by default.
 
+#### Syncing with upstream
+
+Upstream ships fonts without Hebrew glyphs. This fork layers a NotoSansHebrew fallback on top during font generation. To keep conflicts minimal, the generated font files are registered as `merge=ours` in `.gitattributes`, so an upstream sync never touches them — but that means you **must** regenerate them afterwards or you'll ship upstream's source changes with stale pre-sync font binaries.
+
+One-time setup (per clone):
+
+```bash
+git config merge.ours.driver true
+pip install freetype-py==2.5.1
+```
+
+Each sync:
+
+```bash
+git fetch upstream
+git merge upstream/master
+# resolve any source-code conflicts (Hebrew commits may touch same
+# lines as upstream), then regenerate:
+
+# Git Bash / Linux / macOS:
+bash scripts/regen-after-merge.sh
+
+# Windows PowerShell:
+powershell.exe -File scripts/regen-after-merge.ps1
+
+# then verify + commit
+pio run
+git add lib/EpdFont/builtinFonts/ src/fontIds.h
+git commit -m "chore: regenerate fonts after upstream sync"
+```
+
+The regen script runs upstream's font conversion first (picks up any new flags or output format), then re-runs NotoSans / Ubuntu / notosans_8 with Hebrew fallback layered on, then rehashes `src/fontIds.h`.
+
 See [the user guide](./USER_GUIDE.md) for instructions on operating CrossPoint, including the
 [KOReader Sync quick setup](./USER_GUIDE.md#365-koreader-sync-quick-setup).
 
