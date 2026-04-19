@@ -14,7 +14,7 @@ for size in ${BOOKERLY_FONT_SIZES[@]}; do
     font_name="bookerly_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
     font_path="../builtinFonts/source/Bookerly/Bookerly-${style}.ttf"
     output_path="../builtinFonts/${font_name}.h"
-    python fontconvert.py $font_name $size $font_path --2bit --compress > $output_path
+    python fontconvert.py $font_name $size $font_path --2bit --compress --pnum > $output_path
     echo "Generated $output_path"
   done
 done
@@ -33,7 +33,7 @@ for size in ${NOTOSANS_FONT_SIZES[@]}; do
     hebrew_fallback_var="NOTOSANS_HEBREW_FALLBACK_${style}"
     hebrew_fallback="${!hebrew_fallback_var}"
     output_path="../builtinFonts/${font_name}.h"
-    python fontconvert.py $font_name $size $font_path $hebrew_fallback --2bit --compress > $output_path
+    python fontconvert.py $font_name $size $font_path $hebrew_fallback --2bit --compress --pnum > $output_path
     echo "Generated $output_path (with Hebrew fallback)"
   done
 done
