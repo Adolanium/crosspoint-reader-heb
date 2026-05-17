@@ -1,0 +1,15 @@
+{
+  "name": "Rtl",
+  "version": "1.0.0",
+  "description": "RTL/Hebrew extension layer for crosspoint-reader.",
+  "build": {
+    "libCompatMode": "deep"
+  },
+  "dependencies": [
+    "Utf8",
+    "GfxRenderer",
+    "Epub",
+    "hal",
+    "EpdFont"
+  ]
+}

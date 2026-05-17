@@ -4,6 +4,7 @@
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <Rtl.h>  // RTL_FORK
 #include <Utf8.h>
 #include <XmlParserUtils.h>
 #include <expat.h>
@@ -108,6 +109,14 @@ void ChapterHtmlSlimParser::flushPartWordBuffer() {
 
   // flush the buffer
   partWordBuffer[partWordBufferIndex] = '\0';
+
+  // RTL_FORK
+  if (Rtl::WordEmitter::emit(currentTextBlock.get(), partWordBuffer, partWordBufferIndex, fontStyle,
+                             nextWordContinues)) {
+    partWordBufferIndex = 0;
+    return;
+  }
+
   currentTextBlock->addWord(partWordBuffer, fontStyle, false, nextWordContinues);
   partWordBufferIndex = 0;
   nextWordContinues = false;
@@ -180,6 +189,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   auto centeredBlockStyle = BlockStyle();
   centeredBlockStyle.textAlignDefined = true;
   centeredBlockStyle.alignment = CssTextAlign::Center;
+  Rtl::ParserHook::setInheritedDirection(&centeredBlockStyle);  // RTL_FORK
 
   // Compute CSS style for this element early so display:none can short-circuit
   // before tag-specific branches emit any content or metadata.
@@ -191,6 +201,8 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       cssStyle.applyOver(inlineStyle);
     }
   }
+
+  Rtl::ParserHook::onStartElement(name, atts, &cssStyle);  // RTL_FORK
 
   // Skip elements with display:none before all fast paths (tables, links, etc.).
   if (cssStyle.hasDisplay() && cssStyle.display == CssDisplay::None) {
@@ -232,6 +244,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
 
     auto tableCellBlockStyle = BlockStyle();
     tableCellBlockStyle.textAlignDefined = true;
+    Rtl::ParserHook::setInheritedDirection(&tableCellBlockStyle);  // RTL_FORK
     const auto align = (self->paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
                            ? CssTextAlign::Justify
                            : static_cast<CssTextAlign>(self->paragraphAlignment);
@@ -597,12 +610,14 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   }
 
   const float emSize = static_cast<float>(self->renderer.getFontAscenderSize(self->fontId));
-  const auto userAlignmentBlockStyle = BlockStyle::fromCssStyle(
+  auto userAlignmentBlockStyle = BlockStyle::fromCssStyle(
       cssStyle, emSize, static_cast<CssTextAlign>(self->paragraphAlignment), self->viewportWidth);
+  Rtl::ParserHook::resolveBlockStyle(&userAlignmentBlockStyle, cssStyle);  // RTL_FORK
 
   if (matches(name, HEADER_TAGS, std::size(HEADER_TAGS))) {
     self->currentCssStyle = cssStyle;
     auto headerBlockStyle = BlockStyle::fromCssStyle(cssStyle, emSize, CssTextAlign::Center, self->viewportWidth);
+    Rtl::ParserHook::resolveBlockStyle(&headerBlockStyle, cssStyle);  // RTL_FORK
     headerBlockStyle.textAlignDefined = true;
     if (self->embeddedStyle && cssStyle.hasTextAlign()) {
       headerBlockStyle.alignment = cssStyle.textAlign;
@@ -1046,6 +1061,7 @@ bool ChapterHtmlSlimParser::parseAndBuildPages() {
 
   auto paragraphAlignmentBlockStyle = BlockStyle();
   paragraphAlignmentBlockStyle.textAlignDefined = true;
+  Rtl::ParserHook::setInheritedDirection(&paragraphAlignmentBlockStyle);  // RTL_FORK
   const auto align = rootBlockStyle.alignment;
   paragraphAlignmentBlockStyle.alignment = align;
   startNewTextBlock(paragraphAlignmentBlockStyle);

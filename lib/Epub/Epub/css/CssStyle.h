@@ -2,8 +2,10 @@
 
 #include <cstdint>
 
-// Matches order of PARAGRAPH_ALIGNMENT in CrossPointSettings
-enum class CssTextAlign : uint8_t { Justify = 0, Left = 1, Center = 2, Right = 3, None = 4 };
+// Matches order of PARAGRAPH_ALIGNMENT in CrossPointSettings (0-4).
+// Start/End (RTL_FORK) are logical, resolved to Left/Right based on direction.
+enum class CssTextAlign : uint8_t { Justify = 0, Left = 1, Center = 2, Right = 3, None = 4, Start = 5, End = 6 };
+enum class CssDirection : uint8_t { Ltr = 0, Rtl = 1 };  // RTL_FORK
 enum class CssUnit : uint8_t { Pixels = 0, Em = 1, Rem = 2, Points = 3, Percent = 4 };
 
 // Represents a CSS length value with its unit, allowing deferred resolution to pixels
@@ -129,6 +131,8 @@ struct CssStyle {
   CssLength imageHeight;    // Height for img (e.g. 2em) – width derived from aspect ratio when only height set
   CssLength imageWidth;     // Width for img when both or only width set
   CssDisplay display = CssDisplay::Block;  // display property (Block or None)
+  CssDirection direction = CssDirection::Ltr;  // RTL_FORK
+  bool directionDefined = false;               // RTL_FORK (kept out of CssPropertyFlags to avoid widening the upstream uint16_t bitfield)
 
   CssPropertyFlags defined;  // Tracks which properties were explicitly set
 
@@ -199,6 +203,11 @@ struct CssStyle {
       display = base.display;
       defined.display = 1;
     }
+    // RTL_FORK
+    if (base.hasDirection()) {
+      direction = base.direction;
+      directionDefined = true;
+    }
   }
 
   [[nodiscard]] bool hasTextAlign() const { return defined.textAlign; }
@@ -217,6 +226,7 @@ struct CssStyle {
   [[nodiscard]] bool hasImageHeight() const { return defined.imageHeight; }
   [[nodiscard]] bool hasImageWidth() const { return defined.imageWidth; }
   [[nodiscard]] bool hasDisplay() const { return defined.display; }
+  [[nodiscard]] bool hasDirection() const { return directionDefined; }  // RTL_FORK
 
   void reset() {
     textAlign = CssTextAlign::Left;
@@ -228,6 +238,8 @@ struct CssStyle {
     paddingTop = paddingBottom = paddingLeft = paddingRight = CssLength{};
     imageHeight = imageWidth = CssLength{};
     display = CssDisplay::Block;
+    direction = CssDirection::Ltr;  // RTL_FORK
+    directionDefined = false;        // RTL_FORK
     defined.clearAll();
   }
 };

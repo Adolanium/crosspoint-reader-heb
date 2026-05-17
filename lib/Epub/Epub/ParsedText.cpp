@@ -1,6 +1,7 @@
 #include "ParsedText.h"
 
 #include <GfxRenderer.h>
+#include <Rtl.h>  // RTL_FORK
 #include <Utf8.h>
 
 #include <algorithm>
@@ -309,13 +310,13 @@ std::vector<size_t> ParsedText::computeLineBreaks(const GfxRenderer& renderer, c
     return {};
   }
 
-  // Calculate first line indent (only for left/justified text).
+  // Calculate first line indent (only for left/justified text — or right/justified in RTL via natural-alignment hook).
   // Positive text-indent (paragraph indent) is suppressed when extraParagraphSpacing is on.
   // Negative text-indent (hanging indent, e.g. margin-left:3em; text-indent:-1em) always applies —
   // it is structural (positions the bullet/marker), not decorative.
   const int firstLineIndent =
       blockStyle.textIndentDefined && (blockStyle.textIndent < 0 || !extraParagraphSpacing) &&
-              (blockStyle.alignment == CssTextAlign::Justify || blockStyle.alignment == CssTextAlign::Left)
+              /* RTL_FORK */ Rtl::LineLayout::isNaturalAlignment(blockStyle.isRtl, blockStyle.alignment)
           ? blockStyle.textIndent
           : 0;
 
@@ -431,8 +432,10 @@ void ParsedText::applyParagraphIndent() {
   if (blockStyle.textIndentDefined) {
     // CSS text-indent is explicitly set (even if 0) - don't use fallback EmSpace
     // The actual indent positioning is handled in extractLine()
-  } else if (blockStyle.alignment == CssTextAlign::Justify || blockStyle.alignment == CssTextAlign::Left) {
-    // No CSS text-indent defined - use EmSpace fallback for visual indent
+  } else if (/* RTL_FORK */ !blockStyle.isRtl &&
+             (blockStyle.alignment == CssTextAlign::Justify || blockStyle.alignment == CssTextAlign::Left)) {
+    // No CSS text-indent defined - use EmSpace fallback for visual indent.
+    // (RTL paragraphs handle their indent positionally in extractLine.)
     words.front().insert(0, "\xe2\x80\x83");
   }
 }
@@ -441,13 +444,13 @@ void ParsedText::applyParagraphIndent() {
 std::vector<size_t> ParsedText::computeHyphenatedLineBreaks(const GfxRenderer& renderer, const int fontId,
                                                             const int pageWidth, std::vector<uint16_t>& wordWidths,
                                                             std::vector<bool>& continuesVec) {
-  // Calculate first line indent (only for left/justified text).
+  // Calculate first line indent (only for left/justified — or right/justified in RTL via natural-alignment hook).
   // Positive text-indent (paragraph indent) is suppressed when extraParagraphSpacing is on.
   // Negative text-indent (hanging indent, e.g. margin-left:3em; text-indent:-1em) always applies —
   // it is structural (positions the bullet/marker), not decorative.
   const int firstLineIndent =
       blockStyle.textIndentDefined && (blockStyle.textIndent < 0 || !extraParagraphSpacing) &&
-              (blockStyle.alignment == CssTextAlign::Justify || blockStyle.alignment == CssTextAlign::Left)
+              /* RTL_FORK */ Rtl::LineLayout::isNaturalAlignment(blockStyle.isRtl, blockStyle.alignment)
           ? blockStyle.textIndent
           : 0;
 
@@ -612,14 +615,14 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
   const size_t lastBreakAt = breakIndex > 0 ? lineBreakIndices[breakIndex - 1] : 0;
   const size_t lineWordCount = lineBreak - lastBreakAt;
 
-  // Calculate first line indent (only for left/justified text).
+  // Calculate first line indent (only for left/justified text — or right/justified in RTL via natural-alignment hook).
   // Positive text-indent (paragraph indent) is suppressed when extraParagraphSpacing is on.
   // Negative text-indent (hanging indent, e.g. margin-left:3em; text-indent:-1em) always applies —
   // it is structural (positions the bullet/marker), not decorative.
   const bool isFirstLine = breakIndex == 0;
   const int firstLineIndent =
       isFirstLine && blockStyle.textIndentDefined && (blockStyle.textIndent < 0 || !extraParagraphSpacing) &&
-              (blockStyle.alignment == CssTextAlign::Justify || blockStyle.alignment == CssTextAlign::Left)
+              /* RTL_FORK */ Rtl::LineLayout::isNaturalAlignment(blockStyle.isRtl, blockStyle.alignment)
           ? blockStyle.textIndent
           : 0;
 
@@ -650,7 +653,8 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
     }
   }
 
-  // Calculate spacing (account for indent reducing effective page width on first line)
+  // Calculate spacing (account for indent reducing effective page width on first line).
+  // Positive indent reduces available width; negative indent (hanging) increases it.
   const int effectivePageWidth = pageWidth - firstLineIndent;
   const bool isLastLine = breakIndex == lineBreakIndices.size() - 1;
 
@@ -660,47 +664,54 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
                                ? spareSpace / static_cast<int>(actualGapCount)
                                : 0;
 
-  // Calculate initial x position (first line starts at indent for left/justified text;
-  // may be negative for hanging indents, e.g. margin-left:3em; text-indent:-1em).
-  auto xpos = static_cast<int16_t>(firstLineIndent);
-  if (blockStyle.alignment == CssTextAlign::Right) {
-    xpos = effectivePageWidth - lineWordWidthSum - totalNaturalGaps;
-  } else if (blockStyle.alignment == CssTextAlign::Center) {
-    xpos = (effectivePageWidth - lineWordWidthSum - totalNaturalGaps) / 2;
-  }
-
-  // Pre-calculate X positions for words
-  // Continuation words attach to the previous word with no space before them
   std::vector<int16_t> lineXPos;
-  lineXPos.reserve(lineWordCount);
+  // RTL_FORK
+  if (blockStyle.isRtl) {
+    lineXPos = Rtl::LineLayout::positionLineRtl(blockStyle, words, wordStyles, wordWidths, continuesVec, lastBreakAt,
+                                                lineWordCount, effectivePageWidth, totalNaturalGaps, lineWordWidthSum,
+                                                justifyExtra, isLastLine, fontId, renderer);
+  } else {
+    lineXPos.reserve(lineWordCount);
 
-  for (size_t wordIdx = 0; wordIdx < lineWordCount; wordIdx++) {
-    lineXPos.push_back(xpos);
+    // Calculate initial x position (first line starts at indent for left/justified text;
+    // may be negative for hanging indents, e.g. margin-left:3em; text-indent:-1em).
+    auto xpos = static_cast<int16_t>(firstLineIndent);
+    if (blockStyle.alignment == CssTextAlign::Right) {
+      xpos = effectivePageWidth - lineWordWidthSum - totalNaturalGaps;
+    } else if (blockStyle.alignment == CssTextAlign::Center) {
+      xpos = (effectivePageWidth - lineWordWidthSum - totalNaturalGaps) / 2;
+    }
 
-    const bool nextIsContinuation = wordIdx + 1 < lineWordCount && continuesVec[lastBreakAt + wordIdx + 1];
-    if (nextIsContinuation) {
-      int advance = wordWidths[lastBreakAt + wordIdx];
-      // Cross-boundary kerning for continuation words (e.g. nonbreaking spaces, attached punctuation)
-      advance +=
-          renderer.getKerning(fontId, lastCodepoint(words[lastBreakAt + wordIdx]),
-                              firstCodepoint(words[lastBreakAt + wordIdx + 1]), wordStyles[lastBreakAt + wordIdx]);
-      // Non-breaking space tokens are stretchable — expand them during justification like normal spaces.
-      if (words[lastBreakAt + wordIdx] == " " && continuesVec[lastBreakAt + wordIdx] &&
-          blockStyle.alignment == CssTextAlign::Justify && !isLastLine) {
-        advance += justifyExtra;
+    // Pre-calculate X positions for words
+    // Continuation words attach to the previous word with no space before them
+    for (size_t wordIdx = 0; wordIdx < lineWordCount; wordIdx++) {
+      lineXPos.push_back(xpos);
+
+      const bool nextIsContinuation = wordIdx + 1 < lineWordCount && continuesVec[lastBreakAt + wordIdx + 1];
+      if (nextIsContinuation) {
+        int advance = wordWidths[lastBreakAt + wordIdx];
+        // Cross-boundary kerning for continuation words (e.g. nonbreaking spaces, attached punctuation)
+        advance +=
+            renderer.getKerning(fontId, lastCodepoint(words[lastBreakAt + wordIdx]),
+                                firstCodepoint(words[lastBreakAt + wordIdx + 1]), wordStyles[lastBreakAt + wordIdx]);
+        // Non-breaking space tokens are stretchable — expand them during justification like normal spaces.
+        if (words[lastBreakAt + wordIdx] == " " && continuesVec[lastBreakAt + wordIdx] &&
+            blockStyle.alignment == CssTextAlign::Justify && !isLastLine) {
+          advance += justifyExtra;
+        }
+        xpos += advance;
+      } else {
+        int gap = 0;
+        if (wordIdx + 1 < lineWordCount) {
+          gap = renderer.getSpaceAdvance(fontId, lastCodepoint(words[lastBreakAt + wordIdx]),
+                                         firstCodepoint(words[lastBreakAt + wordIdx + 1]),
+                                         wordStyles[lastBreakAt + wordIdx]);
+        }
+        if (blockStyle.alignment == CssTextAlign::Justify && !isLastLine) {
+          gap += justifyExtra;
+        }
+        xpos += wordWidths[lastBreakAt + wordIdx] + gap;
       }
-      xpos += advance;
-    } else {
-      int gap = 0;
-      if (wordIdx + 1 < lineWordCount) {
-        gap = renderer.getSpaceAdvance(fontId, lastCodepoint(words[lastBreakAt + wordIdx]),
-                                       firstCodepoint(words[lastBreakAt + wordIdx + 1]),
-                                       wordStyles[lastBreakAt + wordIdx]);
-      }
-      if (blockStyle.alignment == CssTextAlign::Justify && !isLastLine) {
-        gap += justifyExtra;
-      }
-      xpos += wordWidths[lastBreakAt + wordIdx] + gap;
     }
   }
 

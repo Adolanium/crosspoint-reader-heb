@@ -2,6 +2,7 @@
 
 #include <HalStorage.h>
 #include <Logging.h>
+#include <Rtl.h>  // RTL_FORK
 #include <Serialization.h>
 
 #include "Epub/css/CssParser.h"
@@ -221,6 +222,7 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
     }
   }
 
+  const std::string& lang = epub->getLanguage();
   ChapterHtmlSlimParser visitor(
       epub, tmpHtmlPath, renderer, fontId, lineCompression, extraParagraphSpacing, paragraphAlignment, viewportWidth,
       viewportHeight, hyphenationEnabled, focusReadingEnabled,
@@ -228,7 +230,9 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
         lut.push_back({this->onPageComplete(std::move(page)), paragraphIndex, listItemIndex});
       },
       embeddedStyle, contentBase, imageBasePath, imageRendering, popupFn, cssParser);
-  Hyphenator::setPreferredLanguage(epub->getLanguage());
+  // RTL_FORK
+  Rtl::ParserHook::ScopedAttach rtlGuard(Rtl::Direction::fromLanguageCode(lang));
+  Hyphenator::setPreferredLanguage(lang);
   success = visitor.parseAndBuildPages();
 
   Storage.remove(tmpHtmlPath.c_str());

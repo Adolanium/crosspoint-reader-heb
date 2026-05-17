@@ -29,6 +29,7 @@ struct BlockStyle {
   int16_t textIndent = 0;
   bool textIndentDefined = false;  // true if text-indent was explicitly set in CSS
   bool textAlignDefined = false;   // true if text-align was explicitly set in CSS
+  bool isRtl = false;              // RTL_FORK
 
   // Combined insets (margin + padding)
   [[nodiscard]] int16_t leftInset() const { return marginLeft + paddingLeft; }
@@ -77,6 +78,7 @@ struct BlockStyle {
         result.alignment = alignment;
         result.textAlignDefined = true;
       }
+      result.isRtl = child.isRtl || isRtl;  // RTL_FORK
     } else {
       result.marginTop = std::max(child.marginTop, marginTop);
       result.marginBottom = std::max(child.marginBottom, marginBottom);
@@ -112,6 +114,7 @@ struct BlockStyle {
       blockStyle.textIndent = cssStyle.textIndent.toPixelsInt16(emSize, vw);
       blockStyle.textIndentDefined = true;
     }
+
     blockStyle.textAlignDefined = cssStyle.hasTextAlign();
     // User setting overrides CSS, unless "Book's Style" alignment setting is selected
     if (paragraphAlignment == CssTextAlign::None) {

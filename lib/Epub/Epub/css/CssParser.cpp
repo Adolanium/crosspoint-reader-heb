@@ -165,8 +165,10 @@ std::vector<std::string> CssParser::splitWhitespace(const std::string& s) {
 CssTextAlign CssParser::interpretAlignment(const std::string& val) {
   const std::string v = normalized(val);
 
-  if (v == "left" || v == "start") return CssTextAlign::Left;
-  if (v == "right" || v == "end") return CssTextAlign::Right;
+  if (v == "left") return CssTextAlign::Left;
+  if (v == "right") return CssTextAlign::Right;
+  if (v == "start") return CssTextAlign::Start;
+  if (v == "end") return CssTextAlign::End;
   if (v == "center") return CssTextAlign::Center;
   if (v == "justify") return CssTextAlign::Justify;
 
@@ -344,6 +346,9 @@ void CssParser::parseDeclarationIntoStyle(const std::string& decl, CssStyle& sty
     const std::string_view displayValue = stripTrailingImportant(propValueBuf);
     style.display = (displayValue == "none") ? CssDisplay::None : CssDisplay::Block;
     style.defined.display = 1;
+  } else if (propNameBuf == "direction") {  // RTL_FORK
+    style.direction = (normalized(propValueBuf) == "rtl") ? CssDirection::Rtl : CssDirection::Ltr;
+    style.directionDefined = true;
   }
 }
 
@@ -720,8 +725,10 @@ bool CssParser::saveToCache() const {
     writeLength(style.imageHeight);
     writeLength(style.imageWidth);
     file.write(static_cast<uint8_t>(style.display));
+    file.write(static_cast<uint8_t>(style.direction));  // RTL_FORK
+    file.write(static_cast<uint8_t>(style.directionDefined ? 1 : 0));  // RTL_FORK
 
-    // Write defined flags as uint16_t
+    // Write defined flags
     uint16_t definedBits = 0;
     if (style.defined.textAlign) definedBits |= 1 << 0;
     if (style.defined.fontStyle) definedBits |= 1 << 1;
@@ -789,7 +796,8 @@ bool CssParser::loadFromCache() {
   constexpr size_t CSS_LENGTH_FIELD_COUNT = 11;
   constexpr size_t CSS_LENGTH_BYTES = sizeof(float) + sizeof(uint8_t);
   constexpr size_t CSS_FIXED_STYLE_BYTES =
-      4 * sizeof(uint8_t) + (CSS_LENGTH_FIELD_COUNT * CSS_LENGTH_BYTES) + sizeof(uint8_t) + sizeof(uint16_t);
+      4 * sizeof(uint8_t) + (CSS_LENGTH_FIELD_COUNT * CSS_LENGTH_BYTES) + sizeof(uint8_t) + sizeof(uint16_t)
+      + 2 * sizeof(uint8_t);  // RTL_FORK (direction enum + directionDefined byte)
 
   // Read each rule
   for (uint16_t i = 0; i < ruleCount; ++i) {
@@ -879,6 +887,17 @@ bool CssParser::loadFromCache() {
       return false;
     }
     style.display = static_cast<CssDisplay>(displayVal);
+
+    // RTL_FORK
+    uint8_t directionVal = 0;
+    uint8_t directionDef = 0;
+    if (file.read(&directionVal, 1) != 1 || file.read(&directionDef, 1) != 1) {
+      rulesBySelector_.clear();
+      file.close();
+      return false;
+    }
+    style.direction = static_cast<CssDirection>(directionVal);
+    style.directionDefined = (directionDef != 0);
 
     // Read defined flags
     uint16_t definedBits = 0;

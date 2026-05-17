@@ -244,6 +244,8 @@ One of the best things about open source is that anyone can take the code in a d
 
 - [crosspoint-reader-papers3](https://github.com/juicecultus/crosspoint-reader-papers3) — Crosspoint port for M5Stack Paper S3. 
 
+<!-- RTL_FORK --> - [crosspoint-reader-heb](https://github.com/Adolanium/crosspoint-reader-heb) — Hebrew/RTL support. See [HEBREW.md](./HEBREW.md).
+
 **Note:** Many of these features will make their way into CrossPoint over time. We maintain a slower pace to ensure rock-solid stability and squash bugs before they reach your device.
 
 Want to build your own device? Be sure to check out the [de-link](https://github.com/iandchasse/de-link) project.
