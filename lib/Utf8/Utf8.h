@@ -36,7 +36,7 @@ inline bool utf8IsCjkBreakable(const uint32_t cp) {
 // Returns true for Unicode combining diacritical marks that should not advance the cursor.
 inline bool utf8IsCombiningMark(const uint32_t cp) {
   return (cp >= 0x0300 && cp <= 0x036F)      // Combining Diacritical Marks
-         // RTL_FORK: Hebrew nikkud and cantillation marks.
+                                             // RTL_FORK: Hebrew nikkud and cantillation marks.
          || (cp >= 0x0591 && cp <= 0x05BD)   // cantillation marks + vowel points
          || (cp == 0x05BF)                   // point rafe
          || (cp >= 0x05C1 && cp <= 0x05C2)   // shin/sin dot

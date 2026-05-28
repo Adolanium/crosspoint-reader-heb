@@ -94,8 +94,6 @@ void setInheritedDirection(BlockStyle* bs) {
   bs->isRtl = g_current ? g_current->defaultRtl : false;
 }
 
-bool currentInheritedRtl() {
-  return g_current ? g_current->defaultRtl : false;
-}
+bool currentInheritedRtl() { return g_current ? g_current->defaultRtl : false; }
 
 }  // namespace Rtl::ParserHook

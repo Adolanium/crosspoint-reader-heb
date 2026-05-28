@@ -39,21 +39,12 @@ bool isNaturalAlignment(const bool isRtl, const CssTextAlign align) {
   return isRtl ? (align == CssTextAlign::Right) : (align == CssTextAlign::Left);
 }
 
-std::vector<int16_t> positionLineRtl(
-    const BlockStyle& blockStyle,
-    const std::vector<std::string>& words,
-    const std::vector<EpdFontFamily::Style>& wordStyles,
-    const std::vector<uint16_t>& wordWidths,
-    const std::vector<bool>& continuesVec,
-    const size_t lastBreakAt,
-    const size_t lineWordCount,
-    const int effectivePageWidth,
-    const int totalNaturalGaps,
-    const int lineWordWidthSum,
-    const int justifyExtra,
-    const bool isLastLine,
-    const int fontId,
-    const GfxRenderer& renderer) {
+std::vector<int16_t> positionLineRtl(const BlockStyle& blockStyle, const std::vector<std::string>& words,
+                                     const std::vector<EpdFontFamily::Style>& wordStyles,
+                                     const std::vector<uint16_t>& wordWidths, const std::vector<bool>& continuesVec,
+                                     const size_t lastBreakAt, const size_t lineWordCount, const int effectivePageWidth,
+                                     const int totalNaturalGaps, const int lineWordWidthSum, const int justifyExtra,
+                                     const bool isLastLine, const int fontId, const GfxRenderer& renderer) {
   std::vector<int16_t> lineXPos;
   lineXPos.reserve(lineWordCount);
 
@@ -73,9 +64,9 @@ std::vector<int16_t> positionLineRtl(
     if (wordIdx + 1 < lineWordCount) {
       const bool nextIsContinuation = continuesVec[lastBreakAt + wordIdx + 1];
       if (nextIsContinuation) {
-        xpos -= renderer.getKerning(fontId, lastCodepoint(words[lastBreakAt + wordIdx]),
-                                    firstCodepoint(words[lastBreakAt + wordIdx + 1]),
-                                    wordStyles[lastBreakAt + wordIdx]);
+        xpos -=
+            renderer.getKerning(fontId, lastCodepoint(words[lastBreakAt + wordIdx]),
+                                firstCodepoint(words[lastBreakAt + wordIdx + 1]), wordStyles[lastBreakAt + wordIdx]);
       } else {
         int gap = renderer.getSpaceAdvance(fontId, lastCodepoint(words[lastBreakAt + wordIdx]),
                                            firstCodepoint(words[lastBreakAt + wordIdx + 1]),
@@ -103,9 +94,9 @@ std::vector<int16_t> positionLineRtl(
           lineXPos[j] = ltrXpos;
           ltrXpos += wordWidths[lastBreakAt + j];
           if (j + 1 < runEnd) {
-            ltrXpos += renderer.getSpaceAdvance(fontId, lastCodepoint(words[lastBreakAt + j]),
-                                                firstCodepoint(words[lastBreakAt + j + 1]),
-                                                wordStyles[lastBreakAt + j]);
+            ltrXpos +=
+                renderer.getSpaceAdvance(fontId, lastCodepoint(words[lastBreakAt + j]),
+                                         firstCodepoint(words[lastBreakAt + j + 1]), wordStyles[lastBreakAt + j]);
           }
         }
       }

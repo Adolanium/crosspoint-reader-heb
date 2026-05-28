@@ -100,13 +100,26 @@ void reverseGraphemeClusters(std::string& word) {
 void mirrorBrackets(std::string& text) {
   for (auto& ch : text) {
     switch (ch) {
-      case '(': ch = ')'; break;
-      case ')': ch = '('; break;
-      case '[': ch = ']'; break;
-      case ']': ch = '['; break;
-      case '{': ch = '}'; break;
-      case '}': ch = '{'; break;
-      default: break;
+      case '(':
+        ch = ')';
+        break;
+      case ')':
+        ch = '(';
+        break;
+      case '[':
+        ch = ']';
+        break;
+      case ']':
+        ch = '[';
+        break;
+      case '{':
+        ch = '}';
+        break;
+      case '}':
+        ch = '{';
+        break;
+      default:
+        break;
     }
   }
 }
@@ -150,9 +163,7 @@ std::string toVisualOrder(const char* text) {
 
   if (paragraphRtl) {
     auto isBracket = [](char c) { return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}'; };
-    auto isTrailPunc = [](char c) {
-      return c == ',' || c == '.' || c == ';' || c == ':' || c == '!' || c == '?';
-    };
+    auto isTrailPunc = [](char c) { return c == ',' || c == '.' || c == ';' || c == ':' || c == '!' || c == '?'; };
 
     std::vector<std::string> expanded;
     expanded.reserve(words.size() + 8);
@@ -167,7 +178,10 @@ std::string toVisualOrder(const char* text) {
         const auto* scan = reinterpret_cast<const unsigned char*>(w.c_str());
         uint32_t cp;
         while ((cp = utf8NextCodepoint(&scan))) {
-          if (isStrongLtrCodepoint(cp)) { hasLatin = true; break; }
+          if (isStrongLtrCodepoint(cp)) {
+            hasLatin = true;
+            break;
+          }
         }
       }
 
@@ -191,13 +205,20 @@ std::string toVisualOrder(const char* text) {
       if ((leadEnd > 0 || trailStart < w.size()) && trailStart > leadEnd) {
         auto mirror = [](char c) -> char {
           switch (c) {
-            case '(': return ')';
-            case ')': return '(';
-            case '[': return ']';
-            case ']': return '[';
-            case '{': return '}';
-            case '}': return '{';
-            default: return c;
+            case '(':
+              return ')';
+            case ')':
+              return '(';
+            case '[':
+              return ']';
+            case ']':
+              return '[';
+            case '{':
+              return '}';
+            case '}':
+              return '{';
+            default:
+              return c;
           }
         };
         for (size_t i = 0; i < leadEnd; i++) {

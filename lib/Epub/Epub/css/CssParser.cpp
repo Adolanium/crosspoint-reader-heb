@@ -735,7 +735,7 @@ bool CssParser::saveToCache() const {
     writeLength(style.imageWidth);
     file.write(static_cast<uint8_t>(style.display));
     file.write(static_cast<uint8_t>(style.verticalAlign));
-    file.write(static_cast<uint8_t>(style.direction));  // RTL_FORK
+    file.write(static_cast<uint8_t>(style.direction));                 // RTL_FORK
     file.write(static_cast<uint8_t>(style.directionDefined ? 1 : 0));  // RTL_FORK
 
     // Write defined flags as uint32_t
@@ -806,9 +806,9 @@ bool CssParser::loadFromCache() {
 
   constexpr size_t CSS_LENGTH_FIELD_COUNT = 11;
   constexpr size_t CSS_LENGTH_BYTES = sizeof(float) + sizeof(uint8_t);
-  constexpr size_t CSS_FIXED_STYLE_BYTES =
-      5 * sizeof(uint8_t) + (CSS_LENGTH_FIELD_COUNT * CSS_LENGTH_BYTES) + sizeof(uint8_t) + sizeof(uint32_t)
-      + 2 * sizeof(uint8_t);  // RTL_FORK (direction enum + directionDefined byte)
+  constexpr size_t CSS_FIXED_STYLE_BYTES = 5 * sizeof(uint8_t) + (CSS_LENGTH_FIELD_COUNT * CSS_LENGTH_BYTES) +
+                                           sizeof(uint8_t) + sizeof(uint32_t) +
+                                           2 * sizeof(uint8_t);  // RTL_FORK (direction enum + directionDefined byte)
 
   // Read each rule
   for (uint16_t i = 0; i < ruleCount; ++i) {

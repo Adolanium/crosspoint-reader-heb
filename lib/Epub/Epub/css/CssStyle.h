@@ -137,8 +137,9 @@ struct CssStyle {
   CssLength imageWidth;     // Width for img when both or only width set
   CssDisplay display = CssDisplay::Block;                       // display property (Block or None)
   CssVerticalAlign verticalAlign = CssVerticalAlign::Baseline;  // vertical-align (super/sub positioning)
-  CssDirection direction = CssDirection::Ltr;  // RTL_FORK
-  bool directionDefined = false;               // RTL_FORK (kept out of CssPropertyFlags to avoid widening the upstream uint16_t bitfield)
+  CssDirection direction = CssDirection::Ltr;                   // RTL_FORK
+  bool directionDefined =
+      false;  // RTL_FORK (kept out of CssPropertyFlags to avoid widening the upstream uint16_t bitfield)
 
   CssPropertyFlags defined;  // Tracks which properties were explicitly set
 

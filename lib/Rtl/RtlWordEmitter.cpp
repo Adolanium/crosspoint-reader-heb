@@ -10,23 +10,26 @@ namespace Rtl::WordEmitter {
 
 namespace {
 
-bool isBracket(const char c) {
-  return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}';
-}
+bool isBracket(const char c) { return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}'; }
 
-bool isTrailPunc(const char c) {
-  return c == ',' || c == '.' || c == ';' || c == ':' || c == '!' || c == '?';
-}
+bool isTrailPunc(const char c) { return c == ',' || c == '.' || c == ';' || c == ':' || c == '!' || c == '?'; }
 
 char mirrorBracket(const char c) {
   switch (c) {
-    case '(': return ')';
-    case ')': return '(';
-    case '[': return ']';
-    case ']': return '[';
-    case '{': return '}';
-    case '}': return '{';
-    default: return c;
+    case '(':
+      return ')';
+    case ')':
+      return '(';
+    case '[':
+      return ']';
+    case ']':
+      return '[';
+    case '{':
+      return '}';
+    case '}':
+      return '{';
+    default:
+      return c;
   }
 }
 
@@ -41,11 +44,8 @@ bool wordHasLatinLetters(const char* word) {
 
 }  // namespace
 
-bool emit(ParsedText* currentTextBlock,
-          char* partWordBuffer,
-          const int partWordBufferIndex,
-          const EpdFontFamily::Style fontStyle,
-          bool& nextWordContinues) {
+bool emit(ParsedText* currentTextBlock, char* partWordBuffer, const int partWordBufferIndex,
+          const EpdFontFamily::Style fontStyle, bool& nextWordContinues) {
   if (!currentTextBlock || !currentTextBlock->getBlockStyle().isRtl) {
     return false;
   }

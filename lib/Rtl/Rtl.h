@@ -94,10 +94,7 @@ namespace WordEmitter {
 // Try RTL-aware emission. Returns true if handled (caller skips its upstream
 // addWord). Returns false for LTR blocks or when no special handling applies.
 // On true, sets nextWordContinues = false; caller resets partWordBufferIndex.
-bool emit(ParsedText* currentTextBlock,
-          char* partWordBuffer,
-          int partWordBufferIndex,
-          EpdFontFamily::Style fontStyle,
+bool emit(ParsedText* currentTextBlock, char* partWordBuffer, int partWordBufferIndex, EpdFontFamily::Style fontStyle,
           bool& nextWordContinues);
 
 }  // namespace WordEmitter
@@ -109,21 +106,12 @@ namespace LineLayout {
 bool isNaturalAlignment(bool isRtl, CssTextAlign align);
 
 // RTL x-positions for a single line. Inputs come from extractLine().
-std::vector<int16_t> positionLineRtl(
-    const BlockStyle& blockStyle,
-    const std::vector<std::string>& words,
-    const std::vector<EpdFontFamily::Style>& wordStyles,
-    const std::vector<uint16_t>& wordWidths,
-    const std::vector<bool>& continuesVec,
-    size_t lastBreakAt,
-    size_t lineWordCount,
-    int effectivePageWidth,
-    int totalNaturalGaps,
-    int lineWordWidthSum,
-    int justifyExtra,
-    bool isLastLine,
-    int fontId,
-    const GfxRenderer& renderer);
+std::vector<int16_t> positionLineRtl(const BlockStyle& blockStyle, const std::vector<std::string>& words,
+                                     const std::vector<EpdFontFamily::Style>& wordStyles,
+                                     const std::vector<uint16_t>& wordWidths, const std::vector<bool>& continuesVec,
+                                     size_t lastBreakAt, size_t lineWordCount, int effectivePageWidth,
+                                     int totalNaturalGaps, int lineWordWidthSum, int justifyExtra, bool isLastLine,
+                                     int fontId, const GfxRenderer& renderer);
 
 }  // namespace LineLayout
 
