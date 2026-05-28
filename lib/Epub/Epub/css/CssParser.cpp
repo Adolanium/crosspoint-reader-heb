@@ -346,6 +346,15 @@ void CssParser::parseDeclarationIntoStyle(const std::string& decl, CssStyle& sty
     const std::string_view displayValue = stripTrailingImportant(propValueBuf);
     style.display = (displayValue == "none") ? CssDisplay::None : CssDisplay::Block;
     style.defined.display = 1;
+  } else if (propNameBuf == "vertical-align") {
+    const std::string v = normalized(propValueBuf);
+    if (v == "super") {
+      style.verticalAlign = CssVerticalAlign::Super;
+      style.defined.verticalAlign = 1;
+    } else if (v == "sub") {
+      style.verticalAlign = CssVerticalAlign::Sub;
+      style.defined.verticalAlign = 1;
+    }
   } else if (propNameBuf == "direction") {  // RTL_FORK
     style.direction = (normalized(propValueBuf) == "rtl") ? CssDirection::Rtl : CssDirection::Ltr;
     style.directionDefined = true;
@@ -465,7 +474,7 @@ void CssParser::processRuleBlockWithStyle(const std::string& selectorGroup, cons
 
 // Main parsing entry point
 
-bool CssParser::loadFromStream(FsFile& source) {
+bool CssParser::loadFromStream(HalFile& source) {
   if (!source) {
     LOG_ERR("CSS", "Cannot read from invalid file");
     return false;
@@ -681,7 +690,7 @@ bool CssParser::saveToCache() const {
     return false;
   }
 
-  FsFile file;
+  HalFile file;
   if (!Storage.openFileForWrite("CSS", cachePath + rulesCache, file)) {
     return false;
   }
@@ -725,11 +734,12 @@ bool CssParser::saveToCache() const {
     writeLength(style.imageHeight);
     writeLength(style.imageWidth);
     file.write(static_cast<uint8_t>(style.display));
+    file.write(static_cast<uint8_t>(style.verticalAlign));
     file.write(static_cast<uint8_t>(style.direction));  // RTL_FORK
     file.write(static_cast<uint8_t>(style.directionDefined ? 1 : 0));  // RTL_FORK
 
-    // Write defined flags
-    uint16_t definedBits = 0;
+    // Write defined flags as uint32_t
+    uint32_t definedBits = 0;
     if (style.defined.textAlign) definedBits |= 1 << 0;
     if (style.defined.fontStyle) definedBits |= 1 << 1;
     if (style.defined.fontWeight) definedBits |= 1 << 2;
@@ -746,6 +756,7 @@ bool CssParser::saveToCache() const {
     if (style.defined.imageHeight) definedBits |= 1 << 13;
     if (style.defined.imageWidth) definedBits |= 1 << 14;
     if (style.defined.display) definedBits |= 1 << 15;
+    if (style.defined.verticalAlign) definedBits |= 1 << 16;
     file.write(reinterpret_cast<const uint8_t*>(&definedBits), sizeof(definedBits));
   }
 
@@ -758,7 +769,7 @@ bool CssParser::loadFromCache() {
     return false;
   }
 
-  FsFile file;
+  HalFile file;
   if (!Storage.openFileForRead("CSS", cachePath + rulesCache, file)) {
     return false;
   }
@@ -796,7 +807,7 @@ bool CssParser::loadFromCache() {
   constexpr size_t CSS_LENGTH_FIELD_COUNT = 11;
   constexpr size_t CSS_LENGTH_BYTES = sizeof(float) + sizeof(uint8_t);
   constexpr size_t CSS_FIXED_STYLE_BYTES =
-      4 * sizeof(uint8_t) + (CSS_LENGTH_FIELD_COUNT * CSS_LENGTH_BYTES) + sizeof(uint8_t) + sizeof(uint16_t)
+      5 * sizeof(uint8_t) + (CSS_LENGTH_FIELD_COUNT * CSS_LENGTH_BYTES) + sizeof(uint8_t) + sizeof(uint32_t)
       + 2 * sizeof(uint8_t);  // RTL_FORK (direction enum + directionDefined byte)
 
   // Read each rule
@@ -888,19 +899,26 @@ bool CssParser::loadFromCache() {
     }
     style.display = static_cast<CssDisplay>(displayVal);
 
+    // Read verticalAlign value
+    uint8_t verticalAlignVal;
+    if (file.read(&verticalAlignVal, 1) != 1) {
+      rulesBySelector_.clear();
+      return false;
+    }
+    style.verticalAlign = static_cast<CssVerticalAlign>(verticalAlignVal);
+
     // RTL_FORK
     uint8_t directionVal = 0;
     uint8_t directionDef = 0;
     if (file.read(&directionVal, 1) != 1 || file.read(&directionDef, 1) != 1) {
       rulesBySelector_.clear();
-      file.close();
       return false;
     }
     style.direction = static_cast<CssDirection>(directionVal);
     style.directionDefined = (directionDef != 0);
 
     // Read defined flags
-    uint16_t definedBits = 0;
+    uint32_t definedBits = 0;
     if (file.read(&definedBits, sizeof(definedBits)) != sizeof(definedBits)) {
       rulesBySelector_.clear();
       return false;
@@ -921,6 +939,7 @@ bool CssParser::loadFromCache() {
     style.defined.imageHeight = (definedBits & 1 << 13) != 0;
     style.defined.imageWidth = (definedBits & 1 << 14) != 0;
     style.defined.display = (definedBits & 1 << 15) != 0;
+    style.defined.verticalAlign = (definedBits & 1 << 16) != 0;
 
     rulesBySelector_[selector] = style;
   }
